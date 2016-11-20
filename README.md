@@ -1,6 +1,12 @@
-# Kraken.js
+kraken.js
+=========
+
+Lead Maintainer: [Jean-Charles Sisk](https://github.com/jasisk)
+
+[![Build Status](https://travis-ci.org/krakenjs/kraken-js.svg?branch=v1.0.x)](https://travis-ci.org/krakenjs/kraken-js)  
 
 Kraken builds upon [express](http://expressjs.com/) and enables environment-aware, dynamic configuration, advanced middleware capabilities, security, and app lifecycle events.
+For more information and examples check out [krakenjs.com](http://krakenjs.com)
 
 
 ## Basic Usage
@@ -73,7 +79,7 @@ properties, for example:
 var options = {
     protocols: {
         file: function file(value, callback) {
-            fs.readFile(value 'utf8', callback)
+            fs.readFile(value, 'utf8', callback);
         }
     }
 };
@@ -142,8 +148,7 @@ The resolve handler is documented in the [shortstop-resolve](https://github.com/
 Using environment suffixes, configuration files are applied and overridden according to the current environment as set
 by `NODE_ENV`. The application looks for a `./config` directory relative to the basedir and looks for `config.json` as the baseline config specification. JSON files matching the current env are processed and loaded. Additionally, JSON configuration files may contain comments.
 
-Valid `NODE_ENV` values are `undefined` or `dev[elopment]`, `test[ing]`, `stag[e|ing]`, `prod[uction]`. Simply
-add a config file with the name, to have it read only in that environment, e.g. `config/development.json`.
+Valid `NODE_ENV` values are `undefined` or `dev[elopment]` (uses `development.json`), `test[ing]` (uses `test.json`), `stag[e|ing]` (uses `staging.json`), `prod[uction]` (uses `config.json`). Simply add a config file with the name, to have it read only in that environment, e.g. `config/development.json`.
 
 
 ### Middleware
@@ -161,6 +166,7 @@ Kraken comes with common middleware already included in its `config.json` file. 
       - *Object*
         - `"timeout"` - milliseconds (default: `30000`)
         - `"template"` - template to render (default: `null`)
+        - `"shutdownHeaders"` - custom headers to write while still disconnecting.
 * `"compress"` - adds compression to server responses
   - Priority - 10
   - Enabled - `false` (disabled in all environments by default)
@@ -172,7 +178,7 @@ Kraken comes with common middleware already included in its `config.json` file. 
       - *String* - local path to the favicon file (default: `"path:./public/favicon.ico"`)
 * `"static"` - serves static files from a specific folder
   - Priority - 40
-  - Module - `"serve-static"` ([npm](https://www.npmjs.org/package/static-static))
+  - Module - `"serve-static"` ([npm](https://www.npmjs.org/package/serve-static))
     - Arguments (*Array*)
       - *String* - local path to serve static files from (default: `"path:./public"`)
 * `"logger"` - logs requests and responses
@@ -194,6 +200,15 @@ Kraken comes with common middleware already included in its `config.json` file. 
 * `"multipart"` - parses multipart FORM bodies
   - Priority - 80
   - Module - `"kraken-js/middleware/multipart"` (delegates to [formidable](https://www.npmjs.org/package/formidable))
+  - Arguments (*Array*)
+      - *Object*
+        - `"encoding"` (*String*) - sets encoding for incoming forms
+        - `"uploadDir"` (*String*) - sets the directory for placing file uploads in
+        - `"keepExtensions"` (*Boolean*) - if you want the files written to the `uploadDir` to include extensions of the original file, set this property to `true`
+        - `"maxFieldsSize"` (*Number*) - limits the amount of memory all fields together (except files) can allocate in bytes
+        - `"maxFields"` (*Number*) - limits the number of fields that the querystring parser will decode
+        - `"hash"` (*String*) - if you want checksums calculated for incoming files, set this to either `"sha1"` or `"md5"`
+        - `"multiples"` (*Boolean*) - if this option is enabled, `req.files` will contain arrays of files for inputs which submit multiple files using the HTML5 `multiple` attribute
 * `"cookieParser"` - parses cookies in request headers
   - Priority - 90
   - Module - `"cookie-parser"` ([npm](https://www.npmjs.org/package/cookie-parser))
@@ -312,7 +327,7 @@ More complicated examples include configuring the session middleware to use a sh
           "session": {
               "module": {
                   // use our own module instead
-                  "name": "path:./lib/middleware/session-redis",
+                  "name": "path:./lib/middleware/redis-session",
                   "arguments": [
                       // express-session configuration
                       {
@@ -441,7 +456,10 @@ kraken-js looks to the `view engines` config property to understand how to load 
             "module": "adaro",
             "renderer": {
                 "method": "dust",
-                "arguments": [{ "cache": false }]
+                "arguments": [{
+                    "cache": false,
+                    "helpers": ["dust-helpers-whatevermodule"]
+                }]
             }
         },
         "js": {
@@ -467,8 +485,6 @@ factory method exported by the module that should be used when settings the rend
 that the renderer is exported by that name, or an object with the properties "method" and "arguments" to identify a factory method.
 For example, using ejs you could set this property to "renderFile" or "__express" as the ejs module exports a renderer directly.
 
-
-
 ## Tests
 ```bash
 $ npm test
@@ -477,4 +493,27 @@ $ npm test
 ## Coverage
 ````bash
 $ npm run-script cover && open coverage/lcov-report/index.html
+```
+
+## Reading app configs from within the kraken app
+
+There are two different ways. You can
+
+* Read it in your `onconfig` handler as mentioned above.
+```
+function (config, callback) {
+    var value = config.get('<key>');
+    ...
+    ...
+    callback(null, config);
+}
+```
+* Read it off the `req` object by doing `req.app.kraken.get('<config-key>')`. So it would look like:
+```
+router.get('/', function (req, res) {
+    var value = req.app.kraken.get('<key>');
+    ...
+    ...
+});
+
 ```
