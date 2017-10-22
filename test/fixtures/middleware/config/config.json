@@ -3,7 +3,9 @@
         "shutdown": {
             "enabled": true,
             "priority": 0,
-            "module": "path:../../../middleware/shutdown"
+            "module": {
+                "name": "path:../../../middleware/shutdown"
+            }
         },
 
         "multipart": {
@@ -12,6 +14,12 @@
             "module": "path:../../../middleware/multipart"
         },
 
-        "appsec": null
+        "appsec": null,
+
+        "favicon": {
+            "module": {
+                "arguments": [ "path:../public/favicon.ico" ]
+            }
+        }
     }
 }

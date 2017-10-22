@@ -1,5 +1,5 @@
 /*───────────────────────────────────────────────────────────────────────────*\
- │  Copyright (C) 2014 eBay Software Foundation                                │
+ │  Copyright 2016 PayPal                                                      │
  │                                                                             │
  │hh ,'""`.                                                                    │
  │  / _  _ \  Licensed under the Apache License, Version 2.0 (the "License");  │
@@ -17,14 +17,32 @@
  \*───────────────────────────────────────────────────────────────────────────*/
 'use strict';
 
+var domain = require('domain');
+var thing = require('core-util-is');
+
 var States = {
     CONNECTED: 0,
     DISCONNECTING: 2
 };
 
 
+function onceThunk() {
+  var called = false;
+  return function once(emitter, events, callback) {
+    function call() {
+      if (!called) {
+        called = true;
+        return callback.apply(this, arguments); // jshint ignore:line
+      }
+    }
+    events.forEach(function (event) {
+      emitter.once(event, call);
+    });
+  };
+}
+
 module.exports = function (config) {
-    var template, timeout, state, app, server;
+    var template, timeout, state, app, server, once, uncaughtException;
 
     function close() {
         state = States.DISCONNECTING;
@@ -35,11 +53,17 @@ module.exports = function (config) {
     template = config.template;
     timeout = config.timeout || 10 * 1000;
     state = States.CONNECTED;
+    uncaughtException = thing.isFunction(config.uncaughtException) && config.uncaughtException;
+
+    once = onceThunk();
 
     return function shutdown(req, res, next) {
+        var headers, d;
+
+        headers = config.shutdownHeaders || {};
 
         function json() {
-            res.send('Server is shutting down.');
+            res.send({message: 'Server is shutting down.'});
         }
 
         function html() {
@@ -47,8 +71,9 @@ module.exports = function (config) {
         }
 
         if (state === States.DISCONNECTING) {
+            headers.Connection = headers.Connection || 'close';
+            res.header(headers);
             res.status(503);
-            res.setHeader('Connection', 'close');
             res.format({
                 json: json,
                 html: html
@@ -61,12 +86,32 @@ module.exports = function (config) {
             // if we've taken at least one request.
             app = req.app;
             server = req.socket.server;
-            process.once('SIGTERM', close);
-            process.once('SIGINT', close);
+
+            once(process, ['SIGTERM', 'SIGINT'], close);
         }
 
-        next();
+        d = domain.create();
 
+        d.add(req);
+        d.add(res);
+
+        d.run(function () {
+            next();
+        });
+
+        d.once('error', function (error) {
+            if (uncaughtException) {
+                uncaughtException(error, req, res, next);
+                return;
+            }
+
+            console.error(new Date().toUTCString(), 'UNCAUGHT', error.message);
+            console.error(error.stack);
+
+            next(error);
+
+            close();
+        });
     };
 
 };

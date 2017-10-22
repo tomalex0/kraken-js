@@ -1,5 +1,5 @@
 /*───────────────────────────────────────────────────────────────────────────*\
- │  Copyright (C) 2014 eBay Software Foundation                                │
+ │  Copyright 2016 PayPal                                                      │
  │                                                                             │
  │hh ,'""`.                                                                    │
  │  / _  _ \  Licensed under the Apache License, Version 2.0 (the "License");  │
@@ -17,10 +17,14 @@
  \*───────────────────────────────────────────────────────────────────────────*/
 'use strict';
 
+var deprecate = require('depd')('kraken-js/middleware/500');
+var debug = require('debuglog')('kraken-js/middleware/500');
 
-module.exports = function (template) {
+
+module.exports = deprecate.function(function serverError(template) {
 
     return function serverError(err, req, res, next) {
+        debug('Server Error:', err.stack);
         var model = { url: req.url, err: err, statusCode: 500 };
 
         if (req.xhr) {
@@ -31,4 +35,4 @@ module.exports = function (template) {
         }
     };
     
-};
+}, 'see github.com/krakenjs/kraken-js/issues/359');

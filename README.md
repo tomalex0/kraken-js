@@ -1,7 +1,32 @@
-# Kraken.js
+![kraken-js](public/krakenLogo.png)
+
+# kraken.js
+
+[![Build Status](https://travis-ci.org/krakenjs/kraken-js.svg?branch=v1.0.x)](https://travis-ci.org/krakenjs/kraken-js)  
 
 Kraken builds upon [express](http://expressjs.com/) and enables environment-aware, dynamic configuration, advanced middleware capabilities, security, and app lifecycle events.
+For more information and examples check out [krakenjs.com](http://krakenjs.com)
 
+Table of Contents
+=================
+
+* [Basic Usage](#basic-usage)
+* [API](#api)
+  * [Options](#options)
+* [Config Protocols](#config-protocols)
+* [Features](#features)
+  * [Configuration](#configuration)
+    * [Environment-aware](#environment-aware)
+  * [Middleware](#middleware)
+    * [Included Middleware](#included-middleware)
+    * [Extending Default Middleware](#extending-default-middleware)
+  * [Application Security](#application-security)
+  * [Lifecycle Events](#lifecycle-events)
+  * [Configuration-based express Settings](#configuration-based-express-settings)
+  * [View Engine Configuration](#view-engine-configuration)
+* [Tests](#tests)
+* [Coverage](#coverage)
+* [Reading app configs from within the kraken app](#reading-app-configs-from-within-the-kraken-app)
 
 ## Basic Usage
 
@@ -80,8 +105,9 @@ var options = {
 ```
 
 #### `uncaughtException` (*Function*, optional)
-Handler for `uncaughtException` errors. See the [endgame](https://github.com/totherik/endgame) module for defaults.
+Handler for `uncaughtException` errors outside of the middleware chain. See the [endgame](https://github.com/totherik/endgame) module for defaults.
 
+For uncaught errors in the middleware chain, see `shutdown` middleware instead.
 
 ## Config Protocols
 kraken comes with the following shortstop protocol handlers by default:
@@ -125,6 +151,9 @@ The exec handler is documented in the [shortstop-handlers](https://github.com/kr
 #### `glob:`
 The glob handler is documented in the [shortstop-handlers](https://github.com/krakenjs/shortstop-handlers#handlersglobbasediroptions) repo.
 
+#### `resolve:`
+The resolve handler is documented in the [shortstop-resolve](https://github.com/jasisk/shortstop-resolve) repo.
+
 
 
 
@@ -157,18 +186,20 @@ Kraken comes with common middleware already included in its `config.json` file. 
       - *Object*
         - `"timeout"` - milliseconds (default: `30000`)
         - `"template"` - template to render (default: `null`)
+        - `"shutdownHeaders"` - custom headers to write while still disconnecting.
+        - `"uncaughtException"` - custom handler - `function (error, req, res, next)` - for uncaught errors. Default behavior is to log the error and then trigger shutdown.
 * `"compress"` - adds compression to server responses
   - Priority - 10
   - Enabled - `false` (disabled in all environments by default)
   - Module - `"compression"` ([npm](https://www.npmjs.org/package/compression))
 * `"favicon"` - serves the site's favicon
   - Priority - 30
-  - Module - `"static-favicon"` ([npm](https://www.npmjs.org/package/static-favicon))
+  - Module - `"serve-favicon"` ([npm](https://www.npmjs.org/package/serve-favicon))
     - Arguments (*Array*)
       - *String* - local path to the favicon file (default: `"path:./public/favicon.ico"`)
 * `"static"` - serves static files from a specific folder
   - Priority - 40
-  - Module - `"serve-static"` ([npm](https://www.npmjs.org/package/static-static))
+  - Module - `"serve-static"` ([npm](https://www.npmjs.org/package/serve-static))
     - Arguments (*Array*)
       - *String* - local path to serve static files from (default: `"path:./public"`)
 * `"logger"` - logs requests and responses
@@ -242,7 +273,7 @@ Additional notes:
 #### Extending Default Middleware
 In any non-trivial Kraken deployment you will likely need to extend the included middleware. Common middleware which need extension include cookie parsing and session handling. In those particular cases, the secrets used should be updated:
 
-```json
+```js
 {
     // include this in your own config.json and this will merge with the Kraken defaults
     "middleware": {
@@ -279,7 +310,7 @@ In any non-trivial Kraken deployment you will likely need to extend the included
 
 Another common update is to pass options to middleware which is configured only with the defaults, such as the compression middleware:
 
-```json
+```js
 {
     "middleware": {
         "compress": {
@@ -301,14 +332,14 @@ More complicated examples include configuring the session middleware to use a sh
 
   1. Overlay the existing session middleware in your configuration:
 
-  ```json
+  ```js
   {
       // in your config.json
       "middleware": {
           "session": {
               "module": {
                   // use our own module instead
-                  "name": "path:./lib/middleware/session-redis",
+                  "name": "path:./lib/middleware/redis-session",
                   "arguments": [
                       // express-session configuration
                       {
@@ -380,7 +411,7 @@ Kraken adds support for additional events to your express app instance:
 Since express instances are themselves config objects, the convention is to set values on the app instance for use by
 express internally as well as other code across the application. kraken-js allows you to configure express via JSON.
 Any properties are supported, but kraken-js defaults include:
-```json
+```js
 {
     "express": {
         "env": "", // NOTE: `env` is managed by the framework. This value will be overwritten.
@@ -410,7 +441,7 @@ configure express to use it for resolving views.
 
 For example:
 
-```json
+```js
 {
     "express": {
         "view": "path:./lib/MyCustomViewResolver"
@@ -422,7 +453,7 @@ For example:
 ### View Engine Configuration
 kraken-js looks to the `view engines` config property to understand how to load and initialize renderers. The value of the
 `view engines` property is an object mapping the desired file extension to engine config settings. For example:
-```json
+```js
 {
     "view engines": {
         "jade": {
@@ -437,7 +468,10 @@ kraken-js looks to the `view engines` config property to understand how to load 
             "module": "adaro",
             "renderer": {
                 "method": "dust",
-                "arguments": [{ "cache": false }]
+                "arguments": [{
+                    "cache": false,
+                    "helpers": ["dust-helpers-whatevermodule"]
+                }]
             }
         },
         "js": {
@@ -469,7 +503,7 @@ $ npm test
 ```
 
 ## Coverage
-````bash
+```bash
 $ npm run-script cover && open coverage/lcov-report/index.html
 ```
 
